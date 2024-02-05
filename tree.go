@@ -233,6 +233,7 @@ walk:
 				// 插入子节点
 				n.addChild(child)
 				n.incrementChildPrio(len(n.indices) - 1)
+				// 注意！！此时的n还未设置path；后续调用insertChild时设置
 				n = child
 			} else if n.wildChild {
 				// inserting a wildcard node, need to check if it conflicts with the existing wildcard
@@ -325,6 +326,7 @@ func (n *node) insertChild(path string, fullPath string, handlers HandlersChain)
 		if wildcard[0] == ':' { // param
 			if i > 0 {
 				// Insert prefix before the current wildcard
+				// 若':'还有字符则切割后设置到n.path中；例:"/test/:name"
 				n.path = path[:i]
 				path = path[i:]
 			}
@@ -408,7 +410,7 @@ func (n *node) insertChild(path string, fullPath string, handlers HandlersChain)
 	}
 
 	// If no wildcard was found, simply insert the path and handle
-	// 未发现占位符/通配符，设置handlers
+	// 未发现占位符/通配符，设置path,handlers,fullPath
 	n.path = path
 	n.handlers = handlers
 	n.fullPath = fullPath
