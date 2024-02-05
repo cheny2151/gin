@@ -326,7 +326,7 @@ func (n *node) insertChild(path string, fullPath string, handlers HandlersChain)
 		if wildcard[0] == ':' { // param
 			if i > 0 {
 				// Insert prefix before the current wildcard
-				// 若':'还有字符则切割后设置到n.path中；例:"/test/:name"
+				// 若':'还有字符则切割后设置到n.path中；例:"/test/:name"（此时未提取公共prefix'/test/'，并且n并未设置path）
 				n.path = path[:i]
 				path = path[i:]
 			}
