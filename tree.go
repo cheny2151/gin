@@ -114,8 +114,9 @@ const (
 )
 
 type node struct {
-	path      string
-	indices   string
+	path    string
+	indices string
+	// 是否含有占位符/通配符子节点
 	wildChild bool
 	nType     nodeType
 	priority  uint32
@@ -171,6 +172,7 @@ walk:
 
 		// Split edge
 		if i < len(n.path) {
+			// 提取公共path[:i],并将原节点设置到children中
 			child := node{
 				path:      n.path[i:],
 				wildChild: n.wildChild,
@@ -192,6 +194,9 @@ walk:
 		}
 
 		// Make new node a child of this node
+		// 若i < len(path)
+		// 则提取子节点并插入；
+		// 否则证明此前提取的公共节点此次作为url使用，直接在该添加上handlers（见下方）。
 		if i < len(path) {
 			path = path[i:]
 			c := path[0]
@@ -205,9 +210,12 @@ walk:
 			}
 
 			// Check if a child with the next path byte exists
+			// 通过索引indices检查是否已经存在相同首字符的节点
 			for i, max := 0, len(n.indices); i < max; i++ {
 				if c == n.indices[i] {
+					// 若存在，则继续操作提取公共节点
 					parentFullPathIndex += len(n.path)
+					// 将此首字符节点的优先级+1并重排序
 					i = n.incrementChildPrio(i)
 					n = n.children[i]
 					continue walk
@@ -217,10 +225,12 @@ walk:
 			// Otherwise insert it
 			if c != ':' && c != '*' && n.nType != catchAll {
 				// []byte for proper unicode char conversion, see #65
+				// 插入子节点的索引（首字符）
 				n.indices += bytesconv.BytesToString([]byte{c})
 				child := &node{
 					fullPath: fullPath,
 				}
+				// 插入子节点
 				n.addChild(child)
 				n.incrementChildPrio(len(n.indices) - 1)
 				n = child
@@ -271,6 +281,7 @@ func findWildcard(path string) (wildcard string, i int, valid bool) {
 	// Find start
 	for start, c := range []byte(path) {
 		// A wildcard starts with ':' (param) or '*' (catch-all)
+		// ':'占位符，"*"通配符
 		if c != ':' && c != '*' {
 			continue
 		}
@@ -280,6 +291,7 @@ func findWildcard(path string) (wildcard string, i int, valid bool) {
 		for end, c := range []byte(path[start+1:]) {
 			switch c {
 			case '/':
+				// 成功提取占位符/通配符
 				return path[start : start+1+end], start, valid
 			case ':', '*':
 				valid = false
@@ -295,6 +307,7 @@ func (n *node) insertChild(path string, fullPath string, handlers HandlersChain)
 		// Find prefix until first wildcard
 		wildcard, i, valid := findWildcard(path)
 		if i < 0 { // No wildcard found
+			// 未发现占位符/通配符
 			break
 		}
 
@@ -328,6 +341,7 @@ func (n *node) insertChild(path string, fullPath string, handlers HandlersChain)
 
 			// if the path doesn't end with the wildcard, then there
 			// will be another subpath starting with '/'
+			// 占位符后还有'/'，需继续解析path
 			if len(wildcard) < len(path) {
 				path = path[len(wildcard):]
 
@@ -341,6 +355,7 @@ func (n *node) insertChild(path string, fullPath string, handlers HandlersChain)
 			}
 
 			// Otherwise we're done. Insert the handle in the new leaf
+			// 完成，插入handlers函数
 			n.handlers = handlers
 			return
 		}
@@ -393,6 +408,7 @@ func (n *node) insertChild(path string, fullPath string, handlers HandlersChain)
 	}
 
 	// If no wildcard was found, simply insert the path and handle
+	// 未发现占位符/通配符，设置handlers
 	n.path = path
 	n.handlers = handlers
 	n.fullPath = fullPath
@@ -424,15 +440,19 @@ walk: // Outer loop for walking the tree
 	for {
 		prefix := n.path
 		if len(path) > len(prefix) {
+			// 找到相同前缀的节点
 			if path[:len(prefix)] == prefix {
+				// 截取相同前缀外的path
 				path = path[len(prefix):]
 
 				// Try all the non-wildcard children first by matching the indices
+				// 根据相同前缀外的path[0]搜索节点索引
 				idxc := path[0]
 				for i, c := range []byte(n.indices) {
 					if c == idxc {
 						//  strings.HasPrefix(n.children[len(n.children)-1].path, ":") == n.wildChild
 						if n.wildChild {
+							// 若节点存在占位符/通配符子节点，则创建skippedNode添加到skippedNodes中
 							index := len(*skippedNodes)
 							*skippedNodes = (*skippedNodes)[:index+1]
 							(*skippedNodes)[index] = skippedNode{
@@ -450,11 +470,13 @@ walk: // Outer loop for walking the tree
 							}
 						}
 
+						// 根据索引位置获取子节点,继续匹配path
 						n = n.children[i]
 						continue walk
 					}
 				}
 
+				// 搜索不到索引并且子节点无占位符/通配符
 				if !n.wildChild {
 					// If the path at the end of the loop is not equal to '/' and the current node has no child nodes
 					// the current node needs to roll back to last valid skippedNode
@@ -607,6 +629,7 @@ walk: // Outer loop for walking the tree
 			}
 			// We should have reached the node containing the handle.
 			// Check if this node has a handle registered.
+			// 找到目标节点，value.handlers设置为该节点handlers函数并检查是否为空
 			if value.handlers = n.handlers; value.handlers != nil {
 				value.fullPath = n.fullPath
 				return

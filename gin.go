@@ -206,6 +206,7 @@ func New() *Engine {
 		trustedCIDRs:           defaultTrustedCIDRs,
 	}
 	engine.RouterGroup.engine = engine
+	// 创建Context的pool
 	engine.pool.New = func() any {
 		return engine.allocateContext(engine.maxParams)
 	}
@@ -326,6 +327,7 @@ func (engine *Engine) addRoute(method, path string, handlers HandlersChain) {
 
 	debugPrintRoute(method, path, handlers)
 
+	// root按method分组
 	root := engine.trees.get(method)
 	if root == nil {
 		root = new(node)
@@ -382,6 +384,7 @@ func (engine *Engine) Run(addr ...string) (err error) {
 
 	address := resolveAddress(addr)
 	debugPrint("Listening and serving HTTP on %s\n", address)
+	// 开启http服务监听请求
 	err = http.ListenAndServe(address, engine.Handler())
 	return
 }
@@ -567,13 +570,16 @@ func (engine *Engine) RunListener(listener net.Listener) (err error) {
 
 // ServeHTTP conforms to the http.Handler interface.
 func (engine *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	// 从pool中获取Context
 	c := engine.pool.Get().(*Context)
 	c.writermem.reset(w)
 	c.Request = req
 	c.reset()
 
+	// 处理请求
 	engine.handleHTTPRequest(c)
 
+	// 归还Context
 	engine.pool.Put(c)
 }
 
@@ -603,6 +609,7 @@ func (engine *Engine) handleHTTPRequest(c *Context) {
 
 	// Find root of the tree for the given HTTP method
 	t := engine.trees
+	// 遍历method分组
 	for i, tl := 0, len(t); i < tl; i++ {
 		if t[i].method != httpMethod {
 			continue
@@ -616,6 +623,7 @@ func (engine *Engine) handleHTTPRequest(c *Context) {
 		if value.handlers != nil {
 			c.handlers = value.handlers
 			c.fullPath = value.fullPath
+			// 调用handlers链
 			c.Next()
 			c.writermem.WriteHeaderNow()
 			return
