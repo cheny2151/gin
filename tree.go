@@ -240,6 +240,7 @@ walk:
 				n = n.children[len(n.children)-1]
 				n.priority++
 
+				// 检查是否有通配符冲突（若通配符相同或通配符的下一个字符为'/'则不冲突）
 				// Check if the wildcard matches
 				if len(path) >= len(n.path) && n.path == path[:len(n.path)] &&
 					// Adding a child to a catchAll is not possible
@@ -343,7 +344,7 @@ func (n *node) insertChild(path string, fullPath string, handlers HandlersChain)
 
 			// if the path doesn't end with the wildcard, then there
 			// will be another subpath starting with '/'
-			// 占位符后还有'/'，需继续解析path
+			// 占位符后还有'/'，handlers不属于当前path，需继续解析path
 			if len(wildcard) < len(path) {
 				path = path[len(wildcard):]
 
@@ -357,7 +358,7 @@ func (n *node) insertChild(path string, fullPath string, handlers HandlersChain)
 			}
 
 			// Otherwise we're done. Insert the handle in the new leaf
-			// 完成，插入handlers函数
+			// 完成，设置handlers函数
 			n.handlers = handlers
 			return
 		}

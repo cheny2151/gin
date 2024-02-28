@@ -221,6 +221,7 @@ func Default() *Engine {
 	return engine
 }
 
+// Handler 实现了http.Handler接口
 func (engine *Engine) Handler() http.Handler {
 	if !engine.UseH2C {
 		return engine
@@ -327,7 +328,7 @@ func (engine *Engine) addRoute(method, path string, handlers HandlersChain) {
 
 	debugPrintRoute(method, path, handlers)
 
-	// root按method分组
+	// 一个method对应一个root节点，不存在则创建并添加到engine.trees
 	root := engine.trees.get(method)
 	if root == nil {
 		root = new(node)
@@ -598,11 +599,13 @@ func (engine *Engine) handleHTTPRequest(c *Context) {
 	httpMethod := c.Request.Method
 	rPath := c.Request.URL.Path
 	unescape := false
+	// 默认false
 	if engine.UseRawPath && len(c.Request.URL.RawPath) > 0 {
 		rPath = c.Request.URL.RawPath
 		unescape = engine.UnescapePathValues
 	}
 
+	// 默认false
 	if engine.RemoveExtraSlash {
 		rPath = cleanPath(rPath)
 	}

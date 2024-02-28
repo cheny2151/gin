@@ -102,9 +102,10 @@ func TestTreeAddAndGet(t *testing.T) {
 	tree := &node{}
 
 	routes := [...]string{
-		"/tes",
-		//"/test/123",
-		"/test/:name",
+		"/test/123",
+		"/test/:a",
+		"/test/:a/:b",
+		"/test/:a/123",
 	}
 	for _, route := range routes {
 		tree.addRoute(route, fakeHandler(route))
